@@ -23,10 +23,18 @@ private struct SplashView: View {
         ZStack {
             Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255)
                 .ignoresSafeArea()
-            Image("ZeozLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 154, height: 100)
+
+            VStack(spacing: 26) {
+                Image("ZeozLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 154, height: 100)
+
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(Color(red: 234 / 255, green: 1, blue: 0))
+                    .scaleEffect(1.15)
+            }
         }
     }
 }

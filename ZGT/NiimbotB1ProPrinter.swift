@@ -464,7 +464,11 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
 
         for y in 0..<height {
             for x in 0..<width {
-                let i = y * bytesPerRow + x * bytesPerPixel
+                // The B1 Pro output from the iOS/CoreGraphics raster arrives
+                // horizontally mirrored. Sample each source row from right to
+                // left while keeping the NIIMBOT bit order identical to Android.
+                let sourceX = width - 1 - x
+                let i = y * bytesPerRow + sourceX * bytesPerPixel
                 let red = Int(rgba[i])
                 let green = Int(rgba[i + 1])
                 let blue = Int(rgba[i + 2])

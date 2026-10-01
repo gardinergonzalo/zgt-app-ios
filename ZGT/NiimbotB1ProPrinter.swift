@@ -464,11 +464,12 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
 
         for y in 0..<height {
             for x in 0..<width {
-                // The B1 Pro output from the iOS/CoreGraphics raster arrives
-                // horizontally mirrored. Sample each source row from right to
-                // left while keeping the NIIMBOT bit order identical to Android.
-                let sourceX = width - 1 - x
-                let i = y * bytesPerRow + sourceX * bytesPerPixel
+                // Physical iPhone test: after correcting the horizontal mirror,
+                // the label was readable but rotated 180 degrees. Relative to
+                // that raster, the correct final orientation is obtained by
+                // keeping X natural and reversing only the source Y row.
+                let sourceY = height - 1 - y
+                let i = sourceY * bytesPerRow + x * bytesPerPixel
                 let red = Int(rgba[i])
                 let green = Int(rgba[i + 1])
                 let blue = Int(rgba[i + 2])

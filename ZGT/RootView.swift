@@ -23,9 +23,10 @@ private struct SplashView: View {
         ZStack {
             Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255)
                 .ignoresSafeArea()
-            Text("Z")
-                .font(.system(size: 74, weight: .black, design: .rounded))
-                .foregroundStyle(Color(red: 234 / 255, green: 1, blue: 0))
+            Image("ZeozLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 154, height: 100)
         }
     }
 }

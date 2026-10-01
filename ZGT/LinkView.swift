@@ -14,9 +14,10 @@ struct LinkView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Text("Z")
-                    .font(.system(size: 52, weight: .black, design: .rounded))
-                    .foregroundStyle(lime)
+                Image("ZEOZLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 108, height: 73)
                     .padding(.bottom, 24)
 
                 Text("Vinculá tu taller")
@@ -72,7 +73,7 @@ struct LinkView: View {
                 .disabled(isWorking)
                 .padding(.top, 16)
 
-                Text("ZGT · v0.1.0")
+                Text("ZGT · v0.1.1")
                     .font(.system(size: 12))
                     .foregroundStyle(Color(white: 0.38))
                     .padding(.top, 22)

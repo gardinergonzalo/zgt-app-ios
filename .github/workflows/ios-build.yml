@@ -19,18 +19,27 @@ jobs:
       - name: Prepare branding assets
         run: |
           RESOURCE_DIR="ZGT/Resources"
+          ICON_DIR="ZGT/Assets.xcassets/AppIcon.appiconset"
           SOURCE_ICON="/tmp/zgt-source-icon.png"
-          mkdir -p "$RESOURCE_DIR"
+          mkdir -p "$RESOURCE_DIR" "$ICON_DIR"
           base64 -d -i ZGT/Branding/app-icon.png.b64 -o "$SOURCE_ICON"
 
-          # Bundle the exact user-supplied icon as classic iOS icon resources.
-          # PNG compression is disabled in project.yml so sideloaded builds
-          # keep standard PNG bytes instead of CgBI-optimized files.
+          # Full iPhone AppIcon catalog generated from the exact user-supplied PNG.
+          sips -z 40 40 "$SOURCE_ICON" --out "$ICON_DIR/Icon-20@2x.png" >/dev/null
+          sips -z 60 60 "$SOURCE_ICON" --out "$ICON_DIR/Icon-20@3x.png" >/dev/null
+          sips -z 58 58 "$SOURCE_ICON" --out "$ICON_DIR/Icon-29@2x.png" >/dev/null
+          sips -z 87 87 "$SOURCE_ICON" --out "$ICON_DIR/Icon-29@3x.png" >/dev/null
+          sips -z 80 80 "$SOURCE_ICON" --out "$ICON_DIR/Icon-40@2x.png" >/dev/null
+          sips -z 120 120 "$SOURCE_ICON" --out "$ICON_DIR/Icon-40@3x.png" >/dev/null
+          sips -z 120 120 "$SOURCE_ICON" --out "$ICON_DIR/Icon-60@2x.png" >/dev/null
+          sips -z 180 180 "$SOURCE_ICON" --out "$ICON_DIR/Icon-60@3x.png" >/dev/null
+          sips -z 1024 1024 "$SOURCE_ICON" --out "$ICON_DIR/Icon-1024.png" >/dev/null
+
+          # Classic icon resources remain as a sideload fallback.
           sips -z 60 60 "$SOURCE_ICON" --out "$RESOURCE_DIR/ZGTIcon.png" >/dev/null
           sips -z 120 120 "$SOURCE_ICON" --out "$RESOURCE_DIR/ZGTIcon@2x.png" >/dev/null
           sips -z 180 180 "$SOURCE_ICON" --out "$RESOURCE_DIR/ZGTIcon@3x.png" >/dev/null
 
-          # Keep untouched standard-PNG copies for the final sideload package.
           cp "$RESOURCE_DIR/ZGTIcon.png" /tmp/ZGTIcon.png
           cp "$RESOURCE_DIR/ZGTIcon@2x.png" /tmp/ZGTIcon@2x.png
           cp "$RESOURCE_DIR/ZGTIcon@3x.png" /tmp/ZGTIcon@3x.png
@@ -74,14 +83,14 @@ jobs:
           cp /tmp/ZGTIcon@3x.png "$APP_DIR/ZGTIcon@3x.png"
           rm -f "$APP_DIR/app-icon.png.b64"
 
-          rm -rf Payload ZGT-iOS-v0.1.2-unsigned.ipa
+          rm -rf Payload ZGT-iOS-v0.1.3-unsigned.ipa
           mkdir -p Payload
           cp -R "$APP_DIR" Payload/
-          zip -qry ZGT-iOS-v0.1.2-unsigned.ipa Payload
+          zip -qry ZGT-iOS-v0.1.3-unsigned.ipa Payload
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ZGT-iOS-v0.1.2-unsigned
-          path: ZGT-iOS-v0.1.2-unsigned.ipa
+          name: ZGT-iOS-v0.1.3-unsigned
+          path: ZGT-iOS-v0.1.3-unsigned.ipa
           if-no-files-found: error

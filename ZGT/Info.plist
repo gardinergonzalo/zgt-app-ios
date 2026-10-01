@@ -24,6 +24,8 @@
             <array>
                 <string>ZGTIcon</string>
             </array>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
         </dict>
     </dict>
     <key>CFBundlePackageType</key>

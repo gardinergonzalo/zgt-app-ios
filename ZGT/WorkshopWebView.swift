@@ -44,7 +44,7 @@ struct WorkshopWebView: UIViewRepresentable {
         window.__ZGTNativeNiimbotConnected = false;
         window.ZGTNative = {
             __iosBridge: true,
-            appVersion: function () { return '0.1.0'; },
+            appVersion: function () { return '0.1.2'; },
             printNiimbotB1Pro: function (dataUrl) {
                 window.webkit.messageHandlers.zgtNative.postMessage({ action: 'printNiimbotB1Pro', dataUrl: String(dataUrl || '') });
             },
@@ -86,10 +86,14 @@ struct WorkshopWebView: UIViewRepresentable {
                     sendNativeEvent(.error("La etiqueta enviada por ZGT no tiene un formato válido."))
                     return
                 }
-                printer.print(dataURL: dataURL)
+                DispatchQueue.main.async { [weak self] in
+                    self?.printer.print(dataURL: dataURL)
+                }
 
             case "disconnectNiimbotB1Pro":
-                printer.disconnect()
+                DispatchQueue.main.async { [weak self] in
+                    self?.printer.disconnect()
+                }
 
             default:
                 break

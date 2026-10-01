@@ -17,7 +17,7 @@ struct NiimbotNativeEvent {
 final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private struct Packet {
         let command: UInt8
-        let data: Data
+        let data: [UInt8]
     }
 
     private struct Candidate {
@@ -429,24 +429,35 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
         let bytesPerRow = width * bytesPerPixel
         var rgba = [UInt8](repeating: 255, count: height * bytesPerRow)
 
-        guard let context = CGContext(
-            data: &rgba,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            throw PrinterError.invalidImage
+        // Important: CGContext must receive the backing bytes of the Swift array,
+        // not the address of the Array value itself. Passing &rgba can corrupt
+        // memory on a physical iPhone immediately after Bluetooth connects.
+        let rendered = rgba.withUnsafeMutableBytes { rawBuffer -> Bool in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let context = CGContext(
+                    data: baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else {
+                return false
+            }
+
+            context.setFillColor(UIColor.white.cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            context.interpolationQuality = .none
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1, y: -1)
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
         }
 
-        context.setFillColor(UIColor.white.cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        context.interpolationQuality = .none
-        context.translateBy(x: 0, y: CGFloat(height))
-        context.scaleBy(x: 1, y: -1)
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard rendered else {
+            throw PrinterError.invalidImage
+        }
 
         let stride = (width + 7) >> 3
         var packed = Data(repeating: 0, count: stride * height)
@@ -486,19 +497,31 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
         receiveBuffer.append(value)
 
         while receiveBuffer.count >= 7 {
-            guard receiveBuffer[0] == 0x55, receiveBuffer[1] == 0x55 else {
+            // Data can keep a non-zero startIndex after removeFirst/removeSubrange.
+            // Always calculate indexes from startIndex; numeric subscripts such as
+            // receiveBuffer[0] can trap and terminate the app on real BLE traffic.
+            let base = receiveBuffer.startIndex
+            let second = receiveBuffer.index(base, offsetBy: 1)
+
+            guard receiveBuffer[base] == 0x55, receiveBuffer[second] == 0x55 else {
                 receiveBuffer.removeFirst()
                 continue
             }
 
-            let length = Int(receiveBuffer[3])
+            let commandIndex = receiveBuffer.index(base, offsetBy: 2)
+            let lengthIndex = receiveBuffer.index(base, offsetBy: 3)
+            let length = Int(receiveBuffer[lengthIndex])
             let frameLength = 7 + length
             guard receiveBuffer.count >= frameLength else { return }
 
-            let command = receiveBuffer[2]
-            let data = receiveBuffer.subdata(in: 4..<(4 + length))
-            receiveBuffer.removeFirst(frameLength)
-            let packet = Packet(command: command, data: data)
+            let command = receiveBuffer[commandIndex]
+            let dataStart = receiveBuffer.index(base, offsetBy: 4)
+            let dataEnd = receiveBuffer.index(dataStart, offsetBy: length)
+            let frameEnd = receiveBuffer.index(base, offsetBy: frameLength)
+            let payload = Array(receiveBuffer[dataStart..<dataEnd])
+
+            receiveBuffer.removeSubrange(base..<frameEnd)
+            let packet = Packet(command: command, data: payload)
 
             if let waiter = responseWaiter, waiter.command == command {
                 responseWaiter = nil

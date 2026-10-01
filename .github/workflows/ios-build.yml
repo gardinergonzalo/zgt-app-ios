@@ -22,7 +22,7 @@ jobs:
           ICON_DIR="ZGT/Assets.xcassets/AppIcon.appiconset"
           SOURCE_ICON="/tmp/zgt-source-icon.png"
           mkdir -p "$RESOURCE_DIR" "$ICON_DIR"
-          base64 -d -i ZGT/Branding/app-icon.png.b64 -o "$SOURCE_ICON"
+          cp ZGT/Branding/app-icon.png "$SOURCE_ICON"
 
           # Full iPhone AppIcon catalog generated from the exact user-supplied PNG.
           sips -z 40 40 "$SOURCE_ICON" --out "$ICON_DIR/Icon-20@2x.png" >/dev/null
@@ -81,7 +81,7 @@ jobs:
           cp /tmp/ZGTIcon.png "$APP_DIR/ZGTIcon.png"
           cp /tmp/ZGTIcon@2x.png "$APP_DIR/ZGTIcon@2x.png"
           cp /tmp/ZGTIcon@3x.png "$APP_DIR/ZGTIcon@3x.png"
-          rm -f "$APP_DIR/app-icon.png.b64"
+          rm -f "$APP_DIR/app-icon.png.b64" "$APP_DIR/app-icon.png"
 
           rm -rf Payload ZGT-iOS-v0.1.4-unsigned.ipa
           mkdir -p Payload

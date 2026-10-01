@@ -19,7 +19,7 @@ jobs:
       - name: Prepare branding assets
         run: |
           RESOURCE_DIR="ZGT/Resources"
-          SOURCE_ICON="ZGT/Branding/source-icon.png"
+          SOURCE_ICON="/tmp/zgt-source-icon.png"
           mkdir -p "$RESOURCE_DIR"
           base64 -d -i ZGT/Branding/app-icon.png.b64 -o "$SOURCE_ICON"
 

@@ -2,7 +2,9 @@ name: Build ZGT iOS
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - test/v0.1.1-branding-print-stability
   pull_request:
   workflow_dispatch:
 
@@ -15,6 +17,12 @@ jobs:
 
       - name: Install XcodeGen
         run: brew install xcodegen
+
+      - name: Prepare ZEOZ app icon
+        run: |
+          mkdir -p ZGT/Assets.xcassets/AppIcon.appiconset
+          sips -z 1024 1024 Branding/icon-source.png \
+            --out ZGT/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png >/dev/null
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -44,16 +52,25 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             build
 
+      - name: Validate device app bundle
+        run: |
+          APP="build-device/Build/Products/Release-iphoneos/ZGT.app"
+          test -x "$APP/ZGT"
+          test -f "$APP/Info.plist"
+          test -f "$APP/Assets.car"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :NSBluetoothAlwaysUsageDescription" "$APP/Info.plist"
+
       - name: Package unsigned IPA
         run: |
-          rm -rf Payload ZGT-iOS-v0.1.0-unsigned.ipa
+          rm -rf Payload ZGT-iOS-v0.1.1-unsigned.ipa
           mkdir -p Payload
           cp -R build-device/Build/Products/Release-iphoneos/ZGT.app Payload/
-          zip -qry ZGT-iOS-v0.1.0-unsigned.ipa Payload
+          zip -qry ZGT-iOS-v0.1.1-unsigned.ipa Payload
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ZGT-iOS-v0.1.0-unsigned
-          path: ZGT-iOS-v0.1.0-unsigned.ipa
+          name: ZGT-iOS-v0.1.1-unsigned
+          path: ZGT-iOS-v0.1.1-unsigned.ipa
           if-no-files-found: error

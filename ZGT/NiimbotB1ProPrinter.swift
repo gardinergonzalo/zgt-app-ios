@@ -13,7 +13,6 @@ struct NiimbotNativeEvent {
     static func error(_ message: String) -> Self { .init(type: "error", message: message) }
 }
 
-@MainActor
 final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     private struct Packet {
         let command: UInt8
@@ -104,10 +103,21 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     init(emit: @escaping (NiimbotNativeEvent) -> Void) {
         self.emit = emit
         super.init()
-        central = CBCentralManager(delegate: self, queue: .main)
+        central = CBCentralManager(
+            delegate: self,
+            queue: .main,
+            options: [CBCentralManagerOptionShowPowerAlertKey: true]
+        )
     }
 
     func print(dataURL: String) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.print(dataURL: dataURL)
+            }
+            return
+        }
+
         guard !printInProgress else { return }
         printInProgress = true
 
@@ -166,6 +176,13 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     }
 
     func disconnect() {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in
+                self?.disconnect()
+            }
+            return
+        }
+
         central.stopScan()
         if let peripheral {
             central.cancelPeripheralConnection(peripheral)
@@ -429,24 +446,32 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
         let bytesPerRow = width * bytesPerPixel
         var rgba = [UInt8](repeating: 255, count: height * bytesPerRow)
 
-        guard let context = CGContext(
-            data: &rgba,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            throw PrinterError.invalidImage
+        let rendered = rgba.withUnsafeMutableBytes { rawBuffer -> Bool in
+            guard let baseAddress = rawBuffer.baseAddress,
+                  let context = CGContext(
+                    data: baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                  ) else {
+                return false
+            }
+
+            context.setFillColor(UIColor.white.cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+            context.interpolationQuality = .none
+            context.translateBy(x: 0, y: CGFloat(height))
+            context.scaleBy(x: 1, y: -1)
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
         }
 
-        context.setFillColor(UIColor.white.cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        context.interpolationQuality = .none
-        context.translateBy(x: 0, y: CGFloat(height))
-        context.scaleBy(x: 1, y: -1)
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard rendered else {
+            throw PrinterError.invalidImage
+        }
 
         let stride = (width + 7) >> 3
         var packed = Data(repeating: 0, count: stride * height)

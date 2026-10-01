@@ -18,7 +18,7 @@ jobs:
 
       - name: Prepare branding assets
         run: |
-          base64 --decode ZGT/Branding/app-icon.png.b64 > ZGT/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
+          base64 -d -i ZGT/Branding/app-icon.png.b64 -o ZGT/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png
 
       - name: Generate Xcode project
         run: xcodegen generate

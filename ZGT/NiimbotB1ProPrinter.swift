@@ -453,7 +453,10 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
 
         for y in 0..<height {
             for x in 0..<width {
-                let i = y * bytesPerRow + x * bytesPerPixel
+                // La v0.1.5 validada imprime la etiqueta rotada 180°.
+                let sourceX = width - 1 - x
+                let sourceY = height - 1 - y
+                let i = sourceY * bytesPerRow + sourceX * bytesPerPixel
                 let red = Int(rgba[i])
                 let green = Int(rgba[i + 1])
                 let blue = Int(rgba[i + 2])

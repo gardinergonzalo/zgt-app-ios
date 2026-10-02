@@ -73,7 +73,7 @@ struct LinkView: View {
                 .disabled(isWorking)
                 .padding(.top, 16)
 
-                Text("ZGT · v0.1.4")
+                Text("ZGT · v0.1.5")
                     .font(.system(size: 12))
                     .foregroundStyle(Color(white: 0.38))
                     .padding(.top, 22)

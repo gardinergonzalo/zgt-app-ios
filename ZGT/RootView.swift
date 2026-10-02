@@ -28,7 +28,7 @@ private struct SplashView: View {
             Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255)
                 .ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: 40) {
                 Image("ZeozLogo")
                     .resizable()
                     .scaledToFit()
@@ -36,13 +36,13 @@ private struct SplashView: View {
 
                 ZStack {
                     Circle()
-                        .stroke(lime.opacity(0.18), lineWidth: 4)
+                        .stroke(lime.opacity(0.18), lineWidth: 2)
 
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(
                             lime,
-                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round)
                         )
                         .rotationEffect(.degrees(-90))
                 }

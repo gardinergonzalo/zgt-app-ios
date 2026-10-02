@@ -25,7 +25,7 @@ enum LinkResolverError: LocalizedError {
 }
 
 enum LinkResolver {
-    static let endpoint = URL(string: "https://zgt.zeoz.com.ar/wp-json/gtc/v1/app/resolve")!
+    static let endpoint = URL(string: "https://central.zeoz.com.ar/wp-json/gtc/v1/app/resolve")!
 
     static func resolve(code: String) async throws -> (name: String, siteURL: URL) {
         var request = URLRequest(url: endpoint)

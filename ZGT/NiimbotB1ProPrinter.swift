@@ -86,7 +86,7 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     private var peripheral: CBPeripheral?
     private var characteristic: CBCharacteristic?
     private var candidates: [UUID: Candidate] = [:]
-    private var receiveBuffer = Data()
+    private var packetDecoder = NiimbotPacketDecoder()
     private var bufferedPackets: [Packet] = []
 
     private var powerWaiter: CheckedContinuation<Void, Error>?
@@ -453,8 +453,9 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
 
         for y in 0..<height {
             for x in 0..<width {
-                // La v0.1.5 validada imprime la etiqueta rotada 180°.
-                let sourceX = width - 1 - x
+                // Preserve left-to-right columns. Only reverse the row order:
+                // reversing both axes mirrored the physical iOS label.
+                let sourceX = x
                 let sourceY = height - 1 - y
                 let i = sourceY * bytesPerRow + sourceX * bytesPerPixel
                 let red = Int(rgba[i])
@@ -486,22 +487,9 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     }
 
     private func parseIncoming(_ value: Data) {
-        receiveBuffer.append(value)
-
-        while receiveBuffer.count >= 7 {
-            guard receiveBuffer[0] == 0x55, receiveBuffer[1] == 0x55 else {
-                receiveBuffer.removeFirst()
-                continue
-            }
-
-            let length = Int(receiveBuffer[3])
-            let frameLength = 7 + length
-            guard receiveBuffer.count >= frameLength else { return }
-
-            let command = receiveBuffer[2]
-            let data = receiveBuffer.subdata(in: 4..<(4 + length))
-            receiveBuffer.removeFirst(frameLength)
-            let packet = Packet(command: command, data: data)
+        for decoded in packetDecoder.append(value) {
+            let command = decoded.command
+            let packet = Packet(command: command, data: decoded.data)
 
             if let waiter = responseWaiter, waiter.command == command {
                 responseWaiter = nil
@@ -535,7 +523,7 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     private func clearConnectionState() {
         peripheral = nil
         characteristic = nil
-        receiveBuffer.removeAll(keepingCapacity: true)
+        packetDecoder.reset()
         bufferedPackets.removeAll(keepingCapacity: true)
         isConnected = false
     }

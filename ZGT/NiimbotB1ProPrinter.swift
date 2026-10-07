@@ -453,8 +453,9 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
 
         for y in 0..<height {
             for x in 0..<width {
-                // La v0.1.5 validada imprime la etiqueta rotada 180°.
-                let sourceX = width - 1 - x
+                // Preserve left-to-right columns. Only reverse the row order:
+                // reversing both axes mirrored the physical iOS label.
+                let sourceX = x
                 let sourceY = height - 1 - y
                 let i = sourceY * bytesPerRow + sourceX * bytesPerPixel
                 let red = Int(rgba[i])

@@ -44,7 +44,7 @@ struct WorkshopWebView: UIViewRepresentable {
         window.__ZGTNativeNiimbotConnected = false;
         window.ZGTNative = {
             __iosBridge: true,
-            appVersion: function () { return '0.1.7'; },
+            appVersion: function () { return '0.1.8'; },
             printNiimbotB1Pro: function (dataUrl) {
                 window.webkit.messageHandlers.zgtNative.postMessage({ action: 'printNiimbotB1Pro', dataUrl: String(dataUrl || '') });
             },

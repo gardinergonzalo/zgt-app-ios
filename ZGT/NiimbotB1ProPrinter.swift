@@ -18,6 +18,7 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     private struct Packet {
         let command: UInt8
         let data: Data
+        let sequence: UInt64
     }
 
     private struct Candidate {
@@ -86,8 +87,9 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     private var peripheral: CBPeripheral?
     private var characteristic: CBCharacteristic?
     private var candidates: [UUID: Candidate] = [:]
-    private var receiveBuffer = Data()
+    private var decoder = NiimbotPacketDecoder()
     private var bufferedPackets: [Packet] = []
+    private var packetSequence: UInt64 = 0
 
     private var powerWaiter: CheckedContinuation<Void, Error>?
     private var scanWaiter: CheckedContinuation<CBPeripheral, Error>?
@@ -96,7 +98,12 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     private var characteristicWaiter: CheckedContinuation<Void, Error>?
     private var notifyWaiter: CheckedContinuation<Void, Error>?
     private var writeWaiter: (token: UUID, continuation: CheckedContinuation<Void, Error>)?
-    private var responseWaiter: (command: UInt8, token: UUID, continuation: CheckedContinuation<Packet, Error>)?
+    private var responseWaiter: (
+        command: UInt8,
+        minimumSequence: UInt64,
+        token: UUID,
+        continuation: CheckedContinuation<Packet, Error>
+    )?
 
     private(set) var isConnected = false
     private var printInProgress = false
@@ -108,7 +115,10 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     }
 
     func print(dataURL: String) {
-        guard !printInProgress else { return }
+        guard !printInProgress else {
+            emit(.progress("Ya hay una impresión en curso."))
+            return
+        }
         printInProgress = true
 
         Task { @MainActor in
@@ -117,6 +127,11 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
             do {
                 emit(.progress("Buscando NIIMBOT B1 Pro…"))
                 try await ensureConnected()
+
+                // Cada trabajo empieza con una cola limpia. Una respuesta de estado
+                // atrasada nunca debe poder cerrar una impresión nueva.
+                bufferedPackets.removeAll(keepingCapacity: true)
+                decoder.reset()
 
                 let packed = try packImage(dataURL: dataURL)
 
@@ -133,8 +148,11 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
                 )
                 jobStarted = true
 
+                // Consulta inicial de estado requerida por la B1 Pro.
+                // No usamos su respuesta como confirmación del trabajo actual.
                 try await send(0xA3, bytes(1))
-                try await Task.sleep(nanoseconds: 30_000_000)
+                try await Task.sleep(nanoseconds: 120_000_000)
+                bufferedPackets.removeAll { $0.command == 0xB3 }
 
                 let pageSize = bytes(
                     (height >> 8) & 0xff, height & 0xff,
@@ -148,6 +166,11 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
                 try await sendImage(packed)
 
                 _ = try await sendWait(0xE3, bytes(1), response: 0xE4, timeout: 12, step: "fin de página")
+
+                // Damos tiempo a que cualquier respuesta B3 anterior termine de llegar
+                // y la descartamos antes de empezar el polling de ESTA impresión.
+                try await Task.sleep(nanoseconds: 120_000_000)
+                bufferedPackets.removeAll { $0.command == 0xB3 }
 
                 emit(.progress("Imprimiendo…"))
                 try await waitUntilPrinted()
@@ -306,8 +329,14 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
         timeout: TimeInterval,
         step: String
     ) async throws -> Packet {
+        let minimumSequence = packetSequence &+ 1
         try await send(command, data)
-        return try await waitForResponse(response, timeout: timeout, step: step)
+        return try await waitForResponse(
+            response,
+            minimumSequence: minimumSequence,
+            timeout: timeout,
+            step: step
+        )
     }
 
     private func writeRaw(_ value: Data) async throws {
@@ -332,14 +361,31 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
         }
     }
 
-    private func waitForResponse(_ command: UInt8, timeout: TimeInterval, step: String) async throws -> Packet {
-        if let index = bufferedPackets.firstIndex(where: { $0.command == command }) {
+    private func waitForResponse(
+        _ command: UInt8,
+        minimumSequence: UInt64,
+        timeout: TimeInterval,
+        step: String
+    ) async throws -> Packet {
+        // Descarta respuestas históricas del mismo comando.
+        bufferedPackets.removeAll {
+            $0.command == command && $0.sequence < minimumSequence
+        }
+
+        if let index = bufferedPackets.firstIndex(where: {
+            $0.command == command && $0.sequence >= minimumSequence
+        }) {
             return bufferedPackets.remove(at: index)
         }
 
         return try await withCheckedThrowingContinuation { continuation in
             let token = UUID()
-            responseWaiter = (command, token, continuation)
+            responseWaiter = (
+                command,
+                minimumSequence,
+                token,
+                continuation
+            )
 
             DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
                 guard let self,
@@ -453,8 +499,9 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
 
         for y in 0..<height {
             for x in 0..<width {
-                // La v0.1.5 validada imprime la etiqueta rotada 180°.
-                let sourceX = width - 1 - x
+                // Mantiene la orientación validada en v0.1.8:
+                // corrige el espejo horizontal sin alterar la rotación física.
+                let sourceX = x
                 let sourceY = height - 1 - y
                 let i = sourceY * bytesPerRow + sourceX * bytesPerPixel
                 let red = Int(rgba[i])
@@ -486,24 +533,18 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     }
 
     private func parseIncoming(_ value: Data) {
-        receiveBuffer.append(value)
+        for decoded in decoder.append(value) {
+            packetSequence &+= 1
 
-        while receiveBuffer.count >= 7 {
-            guard receiveBuffer[0] == 0x55, receiveBuffer[1] == 0x55 else {
-                receiveBuffer.removeFirst()
-                continue
-            }
+            let packet = Packet(
+                command: decoded.command,
+                data: decoded.data,
+                sequence: packetSequence
+            )
 
-            let length = Int(receiveBuffer[3])
-            let frameLength = 7 + length
-            guard receiveBuffer.count >= frameLength else { return }
-
-            let command = receiveBuffer[2]
-            let data = receiveBuffer.subdata(in: 4..<(4 + length))
-            receiveBuffer.removeFirst(frameLength)
-            let packet = Packet(command: command, data: data)
-
-            if let waiter = responseWaiter, waiter.command == command {
+            if let waiter = responseWaiter,
+               waiter.command == packet.command,
+               packet.sequence >= waiter.minimumSequence {
                 responseWaiter = nil
                 waiter.continuation.resume(returning: packet)
             } else {
@@ -535,8 +576,10 @@ final class NiimbotB1ProPrinter: NSObject, CBCentralManagerDelegate, CBPeriphera
     private func clearConnectionState() {
         peripheral = nil
         characteristic = nil
-        receiveBuffer.removeAll(keepingCapacity: true)
+        decoder.reset()
         bufferedPackets.removeAll(keepingCapacity: true)
+        packetSequence = 0
+        responseWaiter = nil
         isConnected = false
     }
 

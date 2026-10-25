@@ -64,6 +64,7 @@ struct WorkshopWebView: UIViewRepresentable {
         private lazy var printer = NiimbotB1ProPrinter { [weak self] event in
             self?.sendNativeEvent(event)
         }
+        private let contactImporter = ContactImporter()
 
         init(siteURL: URL) {
             self.siteURL = siteURL
@@ -102,7 +103,10 @@ struct WorkshopWebView: UIViewRepresentable {
                 return
             }
 
-            if isTrusted(url: url) {
+            if isTrusted(url: url), isContactExportURL(url) {
+                decisionHandler(.cancel)
+                contactImporter.importContact(from: url, webView: webView)
+            } else if isTrusted(url: url) {
                 decisionHandler(.allow)
             } else if navigationAction.navigationType == .linkActivated {
                 UIApplication.shared.open(url)
@@ -142,6 +146,25 @@ struct WorkshopWebView: UIViewRepresentable {
                   let allowedHost = siteURL.host?.lowercased(),
                   let host = url.host?.lowercased() else { return false }
             return host == allowedHost || host.hasSuffix(".\(allowedHost)")
+        }
+
+        private func isContactExportURL(_ url: URL) -> Bool {
+            guard url.path.hasSuffix("/wp-admin/admin-post.php"),
+                  let components = URLComponents(
+                    url: url,
+                    resolvingAgainstBaseURL: false
+                  ),
+                  let action = components.queryItems?
+                    .first(where: { $0.name == "action" })?
+                    .value?
+                    .lowercased() else {
+                return false
+            }
+
+            // Cubre Clientes y Proveedores sin acoplar la app a un ID concreto.
+            // La WebView sólo deriva al editor nativo las acciones de contacto
+            // del Gestor; el resto de admin-post continúa funcionando normal.
+            return action.hasPrefix("gtm_contacto_")
         }
 
         private func sendNativeEvent(_ event: NiimbotNativeEvent) {

@@ -3,10 +3,11 @@ import WebKit
 import UIKit
 
 struct WorkshopWebView: UIViewRepresentable {
+    @EnvironmentObject private var appearance: AppearanceState
     let siteURL: URL
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(siteURL: siteURL)
+        Coordinator(siteURL: siteURL, appearance: appearance)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -22,6 +23,7 @@ struct WorkshopWebView: UIViewRepresentable {
         )
         config.userContentController.addUserScript(bridgeScript)
         config.userContentController.add(context.coordinator, name: "zgtNative")
+        config.userContentController.add(context.coordinator, name: "zgtAppearance")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -60,21 +62,49 @@ struct WorkshopWebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         let siteURL: URL
+        let appearance: AppearanceState
         weak var webView: WKWebView?
         private lazy var printer = NiimbotB1ProPrinter { [weak self] event in
             self?.sendNativeEvent(event)
         }
         private let contactImporter = ContactImporter()
 
-        init(siteURL: URL) {
+        init(siteURL: URL, appearance: AppearanceState) {
             self.siteURL = siteURL
+            self.appearance = appearance
+            super.init()
+
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(appWillEnterForeground),
+                name: UIApplication.willEnterForegroundNotification,
+                object: nil
+            )
         }
 
         deinit {
+            NotificationCenter.default.removeObserver(self)
             webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zgtNative")
+            webView?.configuration.userContentController.removeScriptMessageHandler(forName: "zgtAppearance")
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "zgtAppearance" {
+                guard let body = message.body as? [String: Any],
+                      let backgroundColor = body["backgroundColor"] as? String else {
+                    return
+                }
+
+                let theme = body["theme"] as? String
+                Task { @MainActor [weak self] in
+                    self?.appearance.apply(
+                        theme: theme,
+                        backgroundHex: backgroundColor
+                    )
+                }
+                return
+            }
+
             guard message.name == "zgtNative",
                   let body = message.body as? [String: Any],
                   let action = body["action"] as? String else { return }
@@ -122,6 +152,24 @@ struct WorkshopWebView: UIViewRepresentable {
                     "(function(){var r=document.getElementById('rememberme');if(r){r.checked=true;r.setAttribute('checked','checked');}})();"
                 )
             }
+
+            requestAppearance(from: webView)
+        }
+
+        @objc private func appWillEnterForeground() {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.appearance.reapply()
+                if let webView = self.webView {
+                    self.requestAppearance(from: webView)
+                }
+            }
+        }
+
+        private func requestAppearance(from webView: WKWebView) {
+            webView.evaluateJavaScript(
+                "window.dispatchEvent(new CustomEvent('zgtAppearanceRequest'));"
+            )
         }
 
         @available(iOS 15.0, *)

@@ -2,26 +2,52 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var appearance: AppearanceState
+
+    private let defaultBackground = Color(
+        red: 20 / 255,
+        green: 20 / 255,
+        blue: 20 / 255
+    )
 
     var body: some View {
         Group {
             if appState.isBooting {
-                SplashView()
+                SplashView(
+                    background: appState.siteURL == nil
+                        ? defaultBackground
+                        : appearance.backgroundColor
+                )
+                .preferredColorScheme(
+                    appState.siteURL == nil ? .dark : appearance.colorScheme
+                )
             } else if let siteURL = appState.siteURL {
                 WorkshopWebView(siteURL: siteURL)
                     .ignoresSafeArea(.container, edges: .bottom)
+                    .background(appearance.backgroundColor.ignoresSafeArea())
+                    .preferredColorScheme(appearance.colorScheme)
             } else {
                 LinkView()
+                    .preferredColorScheme(.dark)
             }
         }
-        .background(Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255))
+        .background(
+            (appState.siteURL == nil
+                ? defaultBackground
+                : appearance.backgroundColor
+            )
+            .ignoresSafeArea()
+        )
+        .onAppear {
+            appearance.reapply()
+        }
     }
 }
 
 private struct SplashView: View {
     @State private var progress: CGFloat = 0
 
-    private let background = Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255)
+    let background: Color
     private let lime = Color(red: 234 / 255, green: 1, blue: 0)
 
     var body: some View {

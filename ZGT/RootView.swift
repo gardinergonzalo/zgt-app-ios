@@ -13,19 +13,12 @@ struct RootView: View {
     var body: some View {
         Group {
             if appState.isBooting {
-                SplashView(
-                    background: appState.siteURL == nil
-                        ? defaultBackground
-                        : appearance.backgroundColor
-                )
-                .preferredColorScheme(
-                    appState.siteURL == nil ? .dark : appearance.colorScheme
-                )
+                SplashView(background: defaultBackground)
+                    .preferredColorScheme(.dark)
             } else if let siteURL = appState.siteURL {
                 WorkshopWebView(siteURL: siteURL)
                     .ignoresSafeArea(.container, edges: .bottom)
                     .background(appearance.backgroundColor.ignoresSafeArea())
-                    .preferredColorScheme(appearance.colorScheme)
             } else {
                 LinkView()
                     .preferredColorScheme(.dark)

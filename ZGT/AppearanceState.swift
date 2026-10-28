@@ -17,17 +17,14 @@ final class AppearanceState: ObservableObject {
     private static let defaultBackgroundHex = "#141414"
 
     init() {
-        let savedHex = UserDefaults.standard.string(forKey: "zgt_appearance_background")
-            ?? Self.defaultBackgroundHex
-        let savedTheme = UserDefaults.standard.string(forKey: "zgt_appearance_theme")
-            ?? "dark"
-        let color = UIColor(zgtHex: savedHex)
-            ?? UIColor(red: 20 / 255, green: 20 / 255, blue: 20 / 255, alpha: 1)
+        // Cada apertura de ZGT comienza deliberadamente en negro.
+        // El tema web se aplica recién cuando el Gestor ya está cargado.
+        let color = UIColor(red: 20 / 255, green: 20 / 255, blue: 20 / 255, alpha: 1)
 
         nativeBackgroundColor = color
-        resolvedTheme = savedTheme
+        resolvedTheme = "dark"
         backgroundColor = Color(uiColor: color)
-        colorScheme = Self.scheme(for: color)
+        colorScheme = .dark
     }
 
     func apply(theme: String?, backgroundHex: String) {
@@ -62,12 +59,16 @@ final class AppearanceState: ObservableObject {
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .forEach { window in
-                // Sólo sincronizamos la superficie nativa. No forzamos
-                // overrideUserInterfaceStyle sobre toda la ventana porque
-                // eso también altera el trait collection de WKWebView.
+                // Sólo cambia el fondo nativo. No modificamos traits,
+                // colorScheme ni overrideUserInterfaceStyle de WKWebView.
                 window.backgroundColor = nativeBackgroundColor
-                window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
             }
+
+        // UIViewControllerBasedStatusBarAppearance está desactivado en
+        // Info.plist para controlar únicamente el contraste de hora/batería
+        // sin alterar el entorno visual del WKWebView.
+        UIApplication.shared.statusBarStyle =
+            colorScheme == .dark ? .lightContent : .darkContent
     }
 
     private static func scheme(for color: UIColor) -> ColorScheme {

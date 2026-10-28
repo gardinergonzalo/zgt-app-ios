@@ -10,7 +10,7 @@ final class WorkshopSession: NSObject, ObservableObject,
 
     let siteURL: URL
     let appearance: AppearanceState
-    let webView: WKWebView
+    private(set) var webView: WKWebView!
 
     private lazy var printer = NiimbotB1ProPrinter { [weak self] event in
         self?.sendNativeEvent(event)
@@ -20,6 +20,7 @@ final class WorkshopSession: NSObject, ObservableObject,
     init(siteURL: URL, appearance: AppearanceState) {
         self.siteURL = siteURL
         self.appearance = appearance
+        super.init()
 
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
@@ -32,16 +33,14 @@ final class WorkshopSession: NSObject, ObservableObject,
             forMainFrameOnly: false
         )
         config.userContentController.addUserScript(bridgeScript)
+        config.userContentController.add(self, name: "zgtNative")
+        config.userContentController.add(self, name: "zgtAppearance")
 
-        self.webView = WKWebView(
+        let webView = WKWebView(
             frame: .zero,
             configuration: config
         )
-
-        super.init()
-
-        config.userContentController.add(self, name: "zgtNative")
-        config.userContentController.add(self, name: "zgtAppearance")
+        self.webView = webView
 
         webView.navigationDelegate = self
         webView.uiDelegate = self

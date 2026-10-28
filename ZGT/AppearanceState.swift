@@ -10,6 +10,10 @@ final class AppearanceState: ObservableObject {
     private var nativeBackgroundColor: UIColor
     private var resolvedTheme: String
 
+    var uiColor: UIColor {
+        nativeBackgroundColor
+    }
+
     private static let defaultBackgroundHex = "#141414"
 
     init() {
@@ -54,14 +58,14 @@ final class AppearanceState: ObservableObject {
     }
 
     private func applyToNativeWindows() {
-        let style: UIUserInterfaceStyle = colorScheme == .dark ? .dark : .light
-
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .forEach { window in
+                // Sólo sincronizamos la superficie nativa. No forzamos
+                // overrideUserInterfaceStyle sobre toda la ventana porque
+                // eso también altera el trait collection de WKWebView.
                 window.backgroundColor = nativeBackgroundColor
-                window.overrideUserInterfaceStyle = style
                 window.rootViewController?.setNeedsStatusBarAppearanceUpdate()
             }
     }

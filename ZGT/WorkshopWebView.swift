@@ -3,8 +3,8 @@ import WebKit
 import UIKit
 
 struct WorkshopWebView: UIViewRepresentable {
-    @EnvironmentObject private var appearance: AppearanceState
     let siteURL: URL
+    let appearance: AppearanceState
 
     func makeCoordinator() -> Coordinator {
         Coordinator(siteURL: siteURL, appearance: appearance)
@@ -26,14 +26,9 @@ struct WorkshopWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "zgtAppearance")
 
         let webView = WKWebView(frame: .zero, configuration: config)
-        webView.isOpaque = false
-        webView.backgroundColor = appearance.uiColor
-        webView.scrollView.backgroundColor = appearance.uiColor
-        if #available(iOS 15.0, *) {
-            webView.underPageBackgroundColor = appearance.uiColor
-        }
-        // Evita mostrar el fondo blanco por defecto de WebKit mientras
-        // WordPress todavía está cargando su CSS.
+        // El WebView conserva siempre su composición nativa. El color enviado
+        // por ZGT sólo controla la safe-area y la barra de estado, nunca la
+        // superficie de WebKit.
         webView.alpha = 0
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
@@ -48,13 +43,8 @@ struct WorkshopWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
-        // Cambiar el tema no recrea ni recarga el WKWebView. Sólo actualizamos
-        // el color que queda detrás del documento y de la safe-area.
-        webView.backgroundColor = appearance.uiColor
-        webView.scrollView.backgroundColor = appearance.uiColor
-        if #available(iOS 15.0, *) {
-            webView.underPageBackgroundColor = appearance.uiColor
-        }
+        // Intencionalmente vacío. Los cambios de apariencia no deben tocar
+        // ninguna propiedad del WKWebView ni provocar recomposición de WebKit.
     }
 
     static let bridgeJavaScript = #"""

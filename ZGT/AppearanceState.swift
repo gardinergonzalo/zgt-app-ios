@@ -3,16 +3,10 @@ import UIKit
 
 @MainActor
 final class AppearanceState: ObservableObject {
-    @Published private(set) var backgroundColor: Color
-    @Published private(set) var colorScheme: ColorScheme
-
     private let defaults = UserDefaults.standard
     private var nativeBackgroundColor: UIColor
     private var resolvedTheme: String
-
-    var uiColor: UIColor {
-        nativeBackgroundColor
-    }
+    private var statusBarStyle: UIStatusBarStyle
 
     private static let defaultBackgroundHex = "#141414"
 
@@ -23,8 +17,7 @@ final class AppearanceState: ObservableObject {
 
         nativeBackgroundColor = color
         resolvedTheme = "dark"
-        backgroundColor = Color(uiColor: color)
-        colorScheme = .dark
+        statusBarStyle = .lightContent
     }
 
     func apply(theme: String?, backgroundHex: String) {
@@ -37,12 +30,13 @@ final class AppearanceState: ObservableObject {
             .lowercased()
 
         nativeBackgroundColor = color
+        let scheme = Self.scheme(for: color)
         resolvedTheme = normalizedTheme?.isEmpty == false
             ? normalizedTheme!
-            : (Self.scheme(for: color) == .dark ? "dark" : "light")
-
-        backgroundColor = Color(uiColor: color)
-        colorScheme = Self.scheme(for: color)
+            : (scheme == .dark ? "dark" : "light")
+        statusBarStyle = scheme == .dark
+            ? .lightContent
+            : .darkContent
 
         defaults.set(backgroundHex, forKey: "zgt_appearance_background")
         defaults.set(resolvedTheme, forKey: "zgt_appearance_theme")
@@ -59,16 +53,17 @@ final class AppearanceState: ObservableObject {
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .forEach { window in
-                // Sólo cambia el fondo nativo. No modificamos traits,
-                // colorScheme ni overrideUserInterfaceStyle de WKWebView.
+                // Pintamos únicamente el contenedor nativo que queda visible
+                // en la safe-area superior. No se toca WKWebView.
                 window.backgroundColor = nativeBackgroundColor
+                window.rootViewController?.view.backgroundColor =
+                    nativeBackgroundColor
             }
 
         // UIViewControllerBasedStatusBarAppearance está desactivado en
         // Info.plist para controlar únicamente el contraste de hora/batería
         // sin alterar el entorno visual del WKWebView.
-        UIApplication.shared.statusBarStyle =
-            colorScheme == .dark ? .lightContent : .darkContent
+        UIApplication.shared.statusBarStyle = statusBarStyle
     }
 
     private static func scheme(for color: UIColor) -> ColorScheme {

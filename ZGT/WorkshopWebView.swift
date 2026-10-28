@@ -26,6 +26,15 @@ struct WorkshopWebView: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "zgtAppearance")
 
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.isOpaque = false
+        webView.backgroundColor = appearance.uiColor
+        webView.scrollView.backgroundColor = appearance.uiColor
+        if #available(iOS 15.0, *) {
+            webView.underPageBackgroundColor = appearance.uiColor
+        }
+        // Evita mostrar el fondo blanco por defecto de WebKit mientras
+        // WordPress todavía está cargando su CSS.
+        webView.alpha = 0
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
@@ -38,7 +47,15 @@ struct WorkshopWebView: UIViewRepresentable {
         return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        // Cambiar el tema no recrea ni recarga el WKWebView. Sólo actualizamos
+        // el color que queda detrás del documento y de la safe-area.
+        webView.backgroundColor = appearance.uiColor
+        webView.scrollView.backgroundColor = appearance.uiColor
+        if #available(iOS 15.0, *) {
+            webView.underPageBackgroundColor = appearance.uiColor
+        }
+    }
 
     static let bridgeJavaScript = #"""
     (function () {
@@ -68,6 +85,7 @@ struct WorkshopWebView: UIViewRepresentable {
             self?.sendNativeEvent(event)
         }
         private let contactImporter = ContactImporter()
+        private var hasShownInitialContent = false
 
         init(siteURL: URL, appearance: AppearanceState) {
             self.siteURL = siteURL
@@ -154,6 +172,36 @@ struct WorkshopWebView: UIViewRepresentable {
             }
 
             requestAppearance(from: webView)
+            revealInitialContentIfNeeded(webView)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            revealInitialContentIfNeeded(webView)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            revealInitialContentIfNeeded(webView)
+        }
+
+        private func revealInitialContentIfNeeded(_ webView: WKWebView) {
+            guard !hasShownInitialContent else { return }
+            hasShownInitialContent = true
+
+            UIView.animate(
+                withDuration: 0.12,
+                delay: 0,
+                options: [.beginFromCurrentState, .allowUserInteraction]
+            ) {
+                webView.alpha = 1
+            }
         }
 
         @objc private func appWillEnterForeground() {

@@ -218,7 +218,7 @@ struct WorkshopWebView: UIViewRepresentable {
         ) {
             guard type == .camera,
                   let host = origin.host.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed),
-                  let url = URL(string: "https:\(host)") else {
+                  let url = URL(string: "https://\(host)") else {
                 decisionHandler(.deny)
                 return
             }

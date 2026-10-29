@@ -7,11 +7,13 @@ struct RootView: View {
         Group {
             if appState.isBooting {
                 SplashView()
+                    .preferredColorScheme(.dark)
             } else if let siteURL = appState.siteURL {
                 WorkshopWebView(siteURL: siteURL)
-                    .ignoresSafeArea(.container, edges: .bottom)
+                    .ignoresSafeArea(.container, edges: [.top, .bottom])
             } else {
                 LinkView()
+                    .preferredColorScheme(.dark)
             }
         }
         .background(Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255))

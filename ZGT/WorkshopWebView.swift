@@ -51,20 +51,21 @@ struct WorkshopWebView: UIViewRepresentable {
         navigationOverlay.isUserInteractionEnabled = true
         navigationOverlay.translatesAutoresizingMaskIntoConstraints = false
 
-        let activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.color = UIColor(red: 234 / 255, green: 1, blue: 0, alpha: 1)
-        activityIndicator.startAnimating()
-        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+        let loadingRing = NativeLoadingRingView()
+        loadingRing.translatesAutoresizingMaskIntoConstraints = false
+        loadingRing.startAnimating(repeats: true)
 
-        navigationOverlay.addSubview(activityIndicator)
+        navigationOverlay.addSubview(loadingRing)
         webView.addSubview(navigationOverlay)
         NSLayoutConstraint.activate([
             navigationOverlay.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
             navigationOverlay.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
             navigationOverlay.topAnchor.constraint(equalTo: webView.topAnchor),
             navigationOverlay.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
-            activityIndicator.centerXAnchor.constraint(equalTo: navigationOverlay.centerXAnchor),
-            activityIndicator.centerYAnchor.constraint(equalTo: navigationOverlay.centerYAnchor)
+            loadingRing.widthAnchor.constraint(equalToConstant: 22),
+            loadingRing.heightAnchor.constraint(equalToConstant: 22),
+            loadingRing.centerXAnchor.constraint(equalTo: navigationOverlay.centerXAnchor),
+            loadingRing.centerYAnchor.constraint(equalTo: navigationOverlay.centerYAnchor)
         ])
         context.coordinator.navigationOverlay = navigationOverlay
 
@@ -349,5 +350,87 @@ private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
         didReceive message: WKScriptMessage
     ) {
         delegate?.userContentController(userContentController, didReceive: message)
+    }
+}
+
+struct ZGTLoadingRing: UIViewRepresentable {
+    let repeats: Bool
+
+    func makeUIView(context: Context) -> NativeLoadingRingView {
+        let view = NativeLoadingRingView()
+        view.startAnimating(repeats: repeats)
+        return view
+    }
+
+    func updateUIView(_ view: NativeLoadingRingView, context: Context) {
+        if view.repeats != repeats {
+            view.startAnimating(repeats: repeats)
+        }
+    }
+}
+
+final class NativeLoadingRingView: UIView {
+    private let trackLayer = CAShapeLayer()
+    private let progressLayer = CAShapeLayer()
+    private(set) var repeats = false
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isOpaque = false
+        backgroundColor = .clear
+        layer.addSublayer(trackLayer)
+        layer.addSublayer(progressLayer)
+
+        trackLayer.fillColor = UIColor.clear.cgColor
+        trackLayer.strokeColor = UIColor.white.withAlphaComponent(0.10).cgColor
+        trackLayer.lineWidth = 1.4
+
+        progressLayer.fillColor = UIColor.clear.cgColor
+        progressLayer.strokeColor = UIColor(red: 234.0 / 255.0, green: 1, blue: 0, alpha: 1).cgColor
+        progressLayer.lineWidth = 1.4
+        progressLayer.lineCap = .round
+        progressLayer.strokeEnd = 0
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let radius = max(0, min(bounds.width, bounds.height) / 2 - 0.7)
+        let circle = UIBezierPath(
+            arcCenter: CGPoint(x: bounds.midX, y: bounds.midY),
+            radius: radius,
+            startAngle: -.pi / 2,
+            endAngle: 3 * .pi / 2,
+            clockwise: true
+        ).cgPath
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trackLayer.frame = bounds
+        trackLayer.path = circle
+        progressLayer.frame = bounds
+        progressLayer.path = circle
+        CATransaction.commit()
+    }
+
+    func startAnimating(repeats: Bool) {
+        self.repeats = repeats
+        progressLayer.removeAnimation(forKey: "zgtRingProgress")
+        progressLayer.strokeEnd = 1
+
+        let animation = CABasicAnimation(keyPath: "strokeEnd")
+        animation.fromValue = 0
+        animation.toValue = 1
+        animation.duration = 0.42
+        animation.timingFunction = CAMediaTimingFunction(name: .linear)
+        animation.fillMode = .forwards
+        animation.isRemovedOnCompletion = false
+        if repeats {
+            animation.repeatCount = .infinity
+        }
+        progressLayer.add(animation, forKey: "zgtRingProgress")
     }
 }

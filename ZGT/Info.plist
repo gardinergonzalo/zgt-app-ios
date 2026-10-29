@@ -32,8 +32,15 @@
     <string>ZGT usa la cámara para leer códigos QR de vehículos.</string>
     <key>NSContactsUsageDescription</key>
     <string>ZGT usa Contactos para permitirte guardar clientes y proveedores desde el Gestor.</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleLightContent</string>
     <key>UILaunchScreen</key>
-    <dict/>
+    <dict>
+        <key>UIColorName</key>
+        <string>LaunchBackground</string>
+    </dict>
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>

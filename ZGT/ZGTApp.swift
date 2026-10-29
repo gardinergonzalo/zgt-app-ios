@@ -8,7 +8,6 @@ struct ZGTApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
-                .preferredColorScheme(.dark)
         }
     }
 }

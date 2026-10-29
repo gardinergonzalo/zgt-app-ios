@@ -62,7 +62,7 @@ struct WorkshopWebView: UIViewRepresentable {
         window.__ZGTNativeNiimbotConnected = false;
         window.ZGTNative = {
             __iosBridge: true,
-            appVersion: function () { return '0.1.17'; },
+            appVersion: function () { return '0.1.18'; },
             printNiimbotB1Pro: function (dataUrl) {
                 window.webkit.messageHandlers.zgtNative.postMessage({
                     action: 'printNiimbotB1Pro',
@@ -142,6 +142,9 @@ struct WorkshopWebView: UIViewRepresentable {
                   let action = body["action"] as? String else { return }
 
             switch action {
+            case "initialContentReady":
+                revealInitialContentIfNeeded()
+
             case "printNiimbotB1Pro":
                 guard let dataURL = body["dataUrl"] as? String,
                       dataURL.hasPrefix("data:image/png;base64,"),
@@ -189,7 +192,7 @@ struct WorkshopWebView: UIViewRepresentable {
                 )
             }
             requestAppearance()
-            revealInitialContentIfNeeded()
+            signalInitialContentReadyAfterPaint(webView)
         }
 
         func webView(
@@ -229,6 +232,19 @@ struct WorkshopWebView: UIViewRepresentable {
             webView?.evaluateJavaScript(
                 "window.dispatchEvent(new CustomEvent('zgtAppearanceRequest'));"
             )
+        }
+
+        private func signalInitialContentReadyAfterPaint(_ webView: WKWebView) {
+            guard !didRevealInitialContent else { return }
+            webView.evaluateJavaScript("""
+            requestAnimationFrame(function () {
+                requestAnimationFrame(function () {
+                    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zgtNative) {
+                        window.webkit.messageHandlers.zgtNative.postMessage({ action: "initialContentReady" });
+                    }
+                });
+            });
+            """)
         }
 
         private func revealInitialContentIfNeeded() {

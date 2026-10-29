@@ -9,7 +9,10 @@ struct RootView: View {
                 SplashView()
             } else if let siteURL = appState.siteURL {
                 WorkshopWebView(siteURL: siteURL)
-                    .ignoresSafeArea(.container, edges: .bottom)
+                    .ignoresSafeArea(
+                        .container,
+                        edges: [.top, .bottom]
+                    )
             } else {
                 LinkView()
             }

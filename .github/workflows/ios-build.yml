@@ -2,7 +2,7 @@ name: Build ZGT iOS
 
 on:
   push:
-    branches: [ fix/ios-0.1.16-from-stable-0.1.9, fix/ios-v0.1.18-stable-makeUIView, fix/ios-android-boot-cover-v0.1.18 ]
+    branches: [ fix/ios-0.1.16-from-stable-0.1.9, fix/ios-v0.1.19-stable-makeUIView, fix/ios-android-boot-cover-v0.1.19, fix/ios-internal-navigation-cover-v0.1.19 ]
   pull_request:
   workflow_dispatch:
 
@@ -46,14 +46,14 @@ jobs:
 
       - name: Package unsigned IPA
         run: |
-          rm -rf Payload ZGT-iOS-v0.1.18-unsigned.ipa
+          rm -rf Payload ZGT-iOS-v0.1.19-unsigned.ipa
           mkdir -p Payload
           cp -R build-device/Build/Products/Release-iphoneos/ZGT.app Payload/
-          zip -qry ZGT-iOS-v0.1.18-unsigned.ipa Payload
+          zip -qry ZGT-iOS-v0.1.19-unsigned.ipa Payload
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ZGT-iOS-v0.1.18-unsigned
-          path: ZGT-iOS-v0.1.18-unsigned.ipa
+          name: ZGT-iOS-v0.1.19-unsigned
+          path: ZGT-iOS-v0.1.19-unsigned.ipa
           if-no-files-found: error

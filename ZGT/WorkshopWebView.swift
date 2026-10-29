@@ -44,6 +44,30 @@ struct WorkshopWebView: UIViewRepresentable {
         context.coordinator.webView = webView
         context.coordinator.observeForeground()
 
+        let navigationOverlay = UIView()
+        navigationOverlay.backgroundColor = context.coordinator.navigationOverlayColor
+        navigationOverlay.isOpaque = true
+        navigationOverlay.isHidden = true
+        navigationOverlay.isUserInteractionEnabled = true
+        navigationOverlay.translatesAutoresizingMaskIntoConstraints = false
+
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.color = UIColor(red: 234 / 255, green: 1, blue: 0, alpha: 1)
+        activityIndicator.startAnimating()
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+
+        navigationOverlay.addSubview(activityIndicator)
+        webView.addSubview(navigationOverlay)
+        NSLayoutConstraint.activate([
+            navigationOverlay.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
+            navigationOverlay.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
+            navigationOverlay.topAnchor.constraint(equalTo: webView.topAnchor),
+            navigationOverlay.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
+            activityIndicator.centerXAnchor.constraint(equalTo: navigationOverlay.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: navigationOverlay.centerYAnchor)
+        ])
+        context.coordinator.navigationOverlay = navigationOverlay
+
         var request = URLRequest(url: siteURL.appendingPathComponent("wp-admin/"))
         request.cachePolicy = .useProtocolCachePolicy
         webView.load(request)
@@ -86,6 +110,8 @@ struct WorkshopWebView: UIViewRepresentable {
         weak var webView: WKWebView?
         var onAppearanceChange: (String, UIStatusBarStyle) -> Void
         var onInitialContentReady: () -> Void
+        var navigationOverlayColor: UIColor = .black
+        weak var navigationOverlay: UIView?
 
         private lazy var printer = NiimbotB1ProPrinter { [weak self] event in
             self?.sendNativeEvent(event)
@@ -133,6 +159,8 @@ struct WorkshopWebView: UIViewRepresentable {
                       let color = UIColor(zgtHex: backgroundHex) else { return }
                 let statusBarStyle: UIStatusBarStyle =
                     color.zgtRelativeLuminance > 0.179 ? .darkContent : .lightContent
+                navigationOverlayColor = color
+                navigationOverlay?.backgroundColor = color
                 onAppearanceChange(backgroundHex, statusBarStyle)
                 return
             }
@@ -142,7 +170,12 @@ struct WorkshopWebView: UIViewRepresentable {
                   let action = body["action"] as? String else { return }
 
             switch action {
+            case "navigationContentReady":
+                hideNavigationOverlay()
+                revealInitialContentIfNeeded()
+
             case "initialContentReady":
+                hideNavigationOverlay()
                 revealInitialContentIfNeeded()
 
             case "printNiimbotB1Pro":
@@ -185,6 +218,15 @@ struct WorkshopWebView: UIViewRepresentable {
             }
         }
 
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            navigationOverlay?.backgroundColor = navigationOverlayColor
+            navigationOverlay?.isHidden = false
+        }
+
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            // didCommit only means a response arrived. Keep the opaque cover until a new frame paints.
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             if webView.url?.path.contains("wp-login.php") == true {
                 webView.evaluateJavaScript(
@@ -192,7 +234,7 @@ struct WorkshopWebView: UIViewRepresentable {
                 )
             }
             requestAppearance()
-            signalInitialContentReadyAfterPaint(webView)
+            signalNavigationContentReadyAfterPaint(webView)
         }
 
         func webView(
@@ -200,6 +242,7 @@ struct WorkshopWebView: UIViewRepresentable {
             didFail navigation: WKNavigation!,
             withError error: Error
         ) {
+            hideNavigationOverlay()
             revealInitialContentIfNeeded()
         }
 
@@ -208,6 +251,7 @@ struct WorkshopWebView: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
+            hideNavigationOverlay()
             revealInitialContentIfNeeded()
         }
 
@@ -234,17 +278,20 @@ struct WorkshopWebView: UIViewRepresentable {
             )
         }
 
-        private func signalInitialContentReadyAfterPaint(_ webView: WKWebView) {
-            guard !didRevealInitialContent else { return }
+        private func signalNavigationContentReadyAfterPaint(_ webView: WKWebView) {
             webView.evaluateJavaScript("""
             requestAnimationFrame(function () {
                 requestAnimationFrame(function () {
                     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zgtNative) {
-                        window.webkit.messageHandlers.zgtNative.postMessage({ action: "initialContentReady" });
+                        window.webkit.messageHandlers.zgtNative.postMessage({ action: "navigationContentReady" });
                     }
                 });
             });
             """)
+        }
+
+        private func hideNavigationOverlay() {
+            navigationOverlay?.isHidden = true
         }
 
         private func revealInitialContentIfNeeded() {

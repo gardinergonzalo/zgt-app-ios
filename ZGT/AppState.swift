@@ -1,10 +1,13 @@
-import Foundation
+import Combine
+import UIKit
 
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var siteURL: URL?
     @Published private(set) var workshopName: String?
     @Published var isBooting = true
+    @Published var isWebContentReady = false
+    @Published var topSafeAreaColorHex = "#000000"
 
     private let defaults = UserDefaults.standard
 
@@ -26,6 +29,9 @@ final class AppState: ObservableObject {
         defaults.set(siteURL.absoluteString, forKey: "site_url")
         self.workshopName = workshopName
         self.siteURL = siteURL
+        isWebContentReady = false
+        topSafeAreaColorHex = "#000000"
+        UIApplication.shared.statusBarStyle = .lightContent
     }
 
     func unlink() {
@@ -34,5 +40,18 @@ final class AppState: ObservableObject {
         defaults.removeObject(forKey: "site_url")
         workshopName = nil
         siteURL = nil
+        isWebContentReady = false
+        topSafeAreaColorHex = "#000000"
+        UIApplication.shared.statusBarStyle = .lightContent
+    }
+
+    func applyNativeAppearance(backgroundColorHex: String, statusBarStyle: UIStatusBarStyle) {
+        guard UIColor(zgtHex: backgroundColorHex) != nil else { return }
+        topSafeAreaColorHex = backgroundColorHex
+        UIApplication.shared.statusBarStyle = statusBarStyle
+    }
+
+    func revealWebContent() {
+        isWebContentReady = true
     }
 }

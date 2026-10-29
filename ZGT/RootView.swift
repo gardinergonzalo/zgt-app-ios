@@ -8,23 +8,43 @@ struct RootView: View {
             if appState.isBooting {
                 SplashView()
             } else if let siteURL = appState.siteURL {
-                WorkshopWebView(siteURL: siteURL)
-                    .ignoresSafeArea(
-                        .container,
-                        edges: [.top, .bottom]
+                ZStack(alignment: .top) {
+                    WorkshopWebView(
+                        siteURL: siteURL,
+                        onAppearanceChange: { backgroundColorHex, statusBarStyle in
+                            appState.applyNativeAppearance(
+                                backgroundColorHex: backgroundColorHex,
+                                statusBarStyle: statusBarStyle
+                            )
+                        },
+                        onInitialContentReady: {
+                            appState.revealWebContent()
+                        }
                     )
+                    .ignoresSafeArea(.container, edges: [.top, .bottom])
+
+                    if !appState.isWebContentReady {
+                        Color.black
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                    }
+
+                    SafeAreaTopSurface(backgroundColorHex: appState.topSafeAreaColorHex)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
             } else {
                 LinkView()
             }
         }
-        .background(Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255))
+        .background(Color.black.ignoresSafeArea())
     }
 }
 
 private struct SplashView: View {
     @State private var progress: CGFloat = 0
 
-    private let background = Color(red: 20 / 255, green: 20 / 255, blue: 20 / 255)
+    private let background = Color.black
     private let lime = Color(red: 234 / 255, green: 1, blue: 0)
 
     var body: some View {

@@ -5,9 +5,7 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if appState.isBooting {
-                SplashView()
-            } else if let siteURL = appState.siteURL {
+            if let siteURL = appState.siteURL {
                 ZStack(alignment: .top) {
                     WorkshopWebView(
                         siteURL: siteURL,
@@ -23,16 +21,27 @@ struct RootView: View {
                     )
                     .ignoresSafeArea(.container, edges: [.top, .bottom])
 
-                    if !appState.isWebContentReady {
+                    if appState.isBooting || !appState.isWebContentReady {
+                        SplashView()
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                            .zIndex(1)
+                    }
+
+                    if !appState.isBooting && appState.isWebContentReady {
+                        SafeAreaTopSurface(backgroundColorHex: appState.topSafeAreaColorHex)
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                            .zIndex(2)
+                    } else {
                         Color.black
                             .ignoresSafeArea()
                             .allowsHitTesting(false)
+                            .zIndex(2)
                     }
-
-                    SafeAreaTopSurface(backgroundColorHex: appState.topSafeAreaColorHex)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
                 }
+            } else if appState.isBooting {
+                SplashView()
             } else {
                 LinkView()
             }

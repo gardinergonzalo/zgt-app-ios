@@ -33,11 +33,6 @@ struct RootView: View {
                             .ignoresSafeArea()
                             .allowsHitTesting(false)
                             .zIndex(2)
-                    } else {
-                        Color.black
-                            .ignoresSafeArea()
-                            .allowsHitTesting(false)
-                            .zIndex(2)
                     }
                 }
             } else if appState.isBooting {
